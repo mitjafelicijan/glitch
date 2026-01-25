@@ -1,9 +1,17 @@
 #include <pthread.h>
+#include <signal.h>
 #include <unistd.h>
 
 #include "glitch.h"
 
 WindowManager wm = {0};
+
+void handle_signal(int signal) {
+	wm.running = 0;
+	wm.restart = 1;
+	printf("running: %d\n", wm.running);
+	log_message(stderr, LOG_DEBUG, "Signal received: %d", signal);
+}
 
 static void* expose_timer_thread(void* arg) {
 	(void)arg;
@@ -48,6 +56,10 @@ int main(int argc, char *argv[]) {
 	} else {
 		pthread_detach(timer_tid);
 	}
+
+	// SIGUSR1 is used for restarting the window manager.
+	// kill -s SIGUSR1 $(pidof glitch)
+	signal(SIGUSR1, handle_signal);
 
 	wm.running = 1;
 	while(wm.running) {
