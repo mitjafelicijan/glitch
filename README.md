@@ -85,14 +85,10 @@ sudo make install
 - Add Glitch to your display manager's session list
 - Select it from the session menu
 
-**From a terminal (if already in X11):**
 ```sh
 # Exit current window manager first, then:
 ./glitch
-```
 
-**From a TTY (text console):**
-```sh
 # Start X server and window manager
 startx ./glitch
 ```
@@ -123,6 +119,11 @@ changes.
 4. **Restart or Reload**:
    - Quit and restart, or
    - Use `Mod+Shift+r` to reload in-place
+
+   You can also sen `SIGUSR1` to trigger restart with
+   ```sh
+   kill -s SIGUSR1 $(pidof glitch)
+   ```
 
 ### Configuration Structure
 
