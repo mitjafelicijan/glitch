@@ -20,6 +20,7 @@ static void* expose_timer_thread(void* arg) {
 		sleep(1);
 
 		if (wm.dpy != NULL) {
+			XLockDisplay(wm.dpy);
 			XEvent event = {0};
 			event.type = Expose;
 			event.xexpose.window = wm.root;
@@ -32,6 +33,7 @@ static void* expose_timer_thread(void* arg) {
 			// This is thread-safe - XSendEvent is designed for this.
 			XSendEvent(wm.dpy, wm.root, False, ExposureMask, &event);
 			XFlush(wm.dpy);
+			XUnlockDisplay(wm.dpy);
 		}
 	}
 	return NULL;
@@ -84,16 +86,7 @@ int main(int argc, char *argv[]) {
 				handle_motion_notify();
 				break;
 			case ClientMessage: 
-				{
-					static Atom redraw_atom = None;
-					if (redraw_atom == None) redraw_atom = XInternAtom(wm.dpy, "GLITCH_WIDGET_REDRAW", False);
-
-					if (wm.ev.xclient.message_type == redraw_atom) {
-						redraw_widgets();
-					} else {
-						handle_client_message();
-					}
-				}
+				handle_client_message();
 				break;
 			case ButtonPress:
 				handle_button_press();

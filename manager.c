@@ -284,6 +284,30 @@ void init_window_manager(void) {
 	XRenderColor black_render = {0x0000, 0x0000, 0x0000, 0xFFFF};
 	XftColorAllocValue(wm.dpy, visual, wm.cmap, &black_render, &wm.xft_root_bg_color);
 
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, mic_active_bg_color, &wm.xft_mic_active_bg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to orange", mic_active_bg_color);
+		XRenderColor render_color = {0xFFFF, 0x8000, 0x0000, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_mic_active_bg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, mic_muted_bg_color, &wm.xft_mic_muted_bg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to dark gray", mic_muted_bg_color);
+		XRenderColor render_color = {0x4444, 0x4444, 0x4444, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_mic_muted_bg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, mic_active_fg_color, &wm.xft_mic_active_fg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to white", mic_active_fg_color);
+		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_mic_active_fg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, mic_muted_fg_color, &wm.xft_mic_muted_fg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to white", mic_muted_fg_color);
+		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_mic_muted_fg);
+	}
+
 	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, widget_fg_color, &wm.xft_widget_color)) {
 		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to gray", widget_fg_color);
 		XRenderColor render_color = {0x8888, 0x8888, 0x8888, 0xFFFF};
@@ -372,6 +396,7 @@ void init_window_manager(void) {
 	}
 	redraw_widgets();
 	update_client_list();
+	init_audio();
 	XSync(wm.dpy, False);
 }
 
@@ -399,8 +424,13 @@ void execute_shortcut(const char *command) {
 }
 
 void deinit_window_manager(void) {
+	deinit_audio();
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_color);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_bg_color);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_active_bg);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_muted_bg);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_active_fg);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_muted_fg);
 	XftDrawDestroy(wm.xft_draw);
 
 	XftFontClose(wm.dpy, wm.font);
@@ -1040,11 +1070,6 @@ void handle_expose(void) {
 			wm.last_widget_update = now_ms;
 		}
 	}
-}
-
-void redraw_widgets(void) {
-	widget_desktop_indicator();
-	widget_datetime();
 }
 
 void set_active_border(Window window) {

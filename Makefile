@@ -1,7 +1,7 @@
 CC           ?= clang
 CFLAGS       := -std=c99 -pedantic -Wall -Wextra -Wunused -Wswitch-enum
-INCLUDES     := $(shell pkg-config --cflags xft)
-LDFLAGS      := $(shell pkg-config --libs x11 xft) -lpthread
+INCLUDES     := $(shell pkg-config --cflags xft libpulse)
+LDFLAGS      := $(shell pkg-config --libs x11 xft libpulse) -lpthread
 DESTDIR      ?= /usr/local
 DISPLAY_NUM  := 69
 
@@ -15,7 +15,7 @@ endif
 
 all: glitch
 
-glitch: main.c logging.c manager.c widgets.c switcher.c
+glitch: main.c logging.c manager.c widgets.c switcher.c audio.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
 config.h:

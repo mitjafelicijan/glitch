@@ -33,17 +33,57 @@ void widget_desktop_indicator(void) {
 	XftDrawStringUtf8(wm.xft_draw, &wm.xft_color, wm.font, text_x, text_y, (FcChar8 *)buf, strlen(buf));
 }
 
-void widget_datetime(void) {
+void widget_mic_indicator(void) {
 	int screen_width = DisplayWidth(wm.dpy, wm.screen);
 	int padding = 3;
 
-	// We need to know the desktop indicator size to position the time correctly.
+	// Desktop indicator size
 	char desktop_buf[8];
 	snprintf(desktop_buf, sizeof(desktop_buf), "%u", wm.current_desktop);
 	XGlyphInfo desktop_extents;
 	XftTextExtentsUtf8(wm.dpy, wm.font, (FcChar8 *)desktop_buf, strlen(desktop_buf), &desktop_extents);
 	int desktop_size = (wm.font->height > desktop_extents.width ? wm.font->height : desktop_extents.width) + padding * 2;
-	int desktop_x = screen_width - desktop_size - 10;
+
+	const char *buf = "MIC";
+	XGlyphInfo extents;
+	XftTextExtentsUtf8(wm.dpy, wm.font, (FcChar8 *)buf, strlen(buf), &extents);
+
+	int size_w = extents.width + padding * 4;
+	int size_h = desktop_size;
+	int x = screen_width - desktop_size - size_w - 20;
+	int y = 10;
+
+	XftColor *bg = wm.mic_muted ? &wm.xft_mic_muted_bg : &wm.xft_mic_active_bg;
+	XftColor *fg = wm.mic_muted ? &wm.xft_mic_muted_fg : &wm.xft_mic_active_fg;
+
+	// Draw the background.
+	XftDrawRect(wm.xft_draw, bg, x, y, size_w, size_h);
+
+	// Center the text.
+	int text_x = x + (size_w - extents.width) / 2 + extents.x;
+	int text_y = y + (size_h - wm.font->ascent - wm.font->descent) / 2 + wm.font->ascent;
+
+	XftDrawStringUtf8(wm.xft_draw, fg, wm.font, text_x, text_y, (FcChar8 *)buf, strlen(buf));
+}
+
+void widget_datetime(void) {
+	int screen_width = DisplayWidth(wm.dpy, wm.screen);
+	int padding = 3;
+
+	// Desktop indicator size
+	char desktop_buf[8];
+	snprintf(desktop_buf, sizeof(desktop_buf), "%u", wm.current_desktop);
+	XGlyphInfo desktop_extents;
+	XftTextExtentsUtf8(wm.dpy, wm.font, (FcChar8 *)desktop_buf, strlen(desktop_buf), &desktop_extents);
+	int desktop_size = (wm.font->height > desktop_extents.width ? wm.font->height : desktop_extents.width) + padding * 2;
+
+	// Mic indicator size
+	const char *mic_buf = "MIC";
+	XGlyphInfo mic_extents;
+	XftTextExtentsUtf8(wm.dpy, wm.font, (FcChar8 *)mic_buf, strlen(mic_buf), &mic_extents);
+	int mic_size_w = mic_extents.width + padding * 4;
+
+	int offset_x = desktop_size + mic_size_w + 40;
 
 	char time_buf[64];
 	time_t now = time(NULL);
@@ -53,7 +93,7 @@ void widget_datetime(void) {
 	XGlyphInfo time_extents;
 	XftTextExtentsUtf8(wm.dpy, wm.font, (FcChar8 *)time_buf, strlen(time_buf), &time_extents);
 
-	int time_x = desktop_x - time_extents.xOff - 20;
+	int time_x = screen_width - offset_x - time_extents.xOff;
 	int y = 10;
 	int win_height = desktop_size;
 
@@ -63,4 +103,10 @@ void widget_datetime(void) {
 	// Draw the time.
 	int time_text_y = y + (win_height - wm.font->ascent - wm.font->descent) / 2 + wm.font->ascent;
 	XftDrawStringUtf8(wm.xft_draw, &wm.xft_color, wm.font, time_x, time_text_y, (FcChar8 *)time_buf, strlen(time_buf));
+}
+
+void redraw_widgets(void) {
+	widget_desktop_indicator();
+	widget_mic_indicator();
+	widget_datetime();
 }

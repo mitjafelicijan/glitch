@@ -23,6 +23,10 @@ static const char *on_top_inactive_border_color = "darkorange";
 static const char *widget_font = "Berkeley Mono:size=7:bold";
 static const char *indicator_fg_color = "white";
 static const char *indicator_bg_color = "blue";
+static const char *mic_active_bg_color = "darkred";
+static const char *mic_muted_bg_color = "#333333";
+static const char *mic_active_fg_color = "white";
+static const char *mic_muted_fg_color = "white";
 static const char *widget_fg_color = "#999999";
 static const char *time_format = "%A %d.%m.%Y %H:%M:%S";
 
@@ -83,6 +87,7 @@ static Keybinds keybinds[] = {
 	{ MODKEY,               XK_f,       toggle_fullscreen,   { 0 }        },
 	{ MODKEY | ShiftMask,   XK_r,       reload,              { 0 }        },
 	{ MODKEY,               XK_c,       center_window,       { 0 }        },
+	{ MODKEY,               XK_m,       toggle_mic_mute,     { 0 }        },
 	{ MODKEY | ShiftMask,   XK_q,       quit,                { 0 }        },
 	{ MODKEY,               XK_q,       close_window,        { 0 }        },
 };

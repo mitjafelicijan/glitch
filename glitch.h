@@ -8,8 +8,11 @@
 #include <X11/keysym.h>
 #include <X11/XF86keysym.h>
 #include <X11/Xft/Xft.h>
+#include <pulse/pulseaudio.h>
 
+#ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 #define LENGTH(x) (sizeof(x) / sizeof((x)[0]))
 
 #define NUM_DESKTOPS 9
@@ -70,6 +73,10 @@ typedef struct {
 	XftColor xft_bg_color;
 	XftColor xft_root_bg_color;
 	XftColor xft_widget_color;
+	XftColor xft_mic_active_bg;
+	XftColor xft_mic_muted_bg;
+	XftColor xft_mic_active_fg;
+	XftColor xft_mic_muted_fg;
 	
 	unsigned long last_widget_update;
 	Client *clients;
@@ -79,6 +86,11 @@ typedef struct {
 	Window *cycle_clients;
 	int cycle_count;
 	int active_cycle_index;
+
+	// PulseAudio
+	pa_threaded_mainloop *pa_mainloop;
+	pa_context *pa_ctx;
+	int mic_muted;
 } WindowManager;
 
 typedef struct {
@@ -159,6 +171,11 @@ void center_window(const Arg *arg);
 
 void widget_desktop_indicator(void);
 void widget_datetime(void);
+void widget_mic_indicator(void);
 void redraw_widgets(void);
+
+void init_audio(void);
+void deinit_audio(void);
+void toggle_mic_mute(const Arg *arg);
 
 #endif // GLITCH_H
