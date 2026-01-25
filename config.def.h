@@ -21,14 +21,13 @@ static const char *on_top_active_border_color = "orange";
 static const char *on_top_inactive_border_color = "darkorange";
 
 static const char *widget_font = "Berkeley Mono:size=7:bold";
+static const char *time_format = "%A %d.%m.%Y %H:%M:%S";
 static const char *indicator_fg_color = "white";
 static const char *indicator_bg_color = "blue";
-static const char *mic_active_bg_color = "darkred";
-static const char *mic_muted_bg_color = "#333333";
+static const char *mic_active_bg_color = "firebrick";
+static const char *mic_muted_bg_color = "#222222";
 static const char *mic_active_fg_color = "white";
 static const char *mic_muted_fg_color = "white";
-static const char *widget_fg_color = "#999999";
-static const char *time_format = "%A %d.%m.%Y %H:%M:%S";
 
 static Shortcut shortcuts[] = {
 	/* Mask                 KeySym                    Shell command */

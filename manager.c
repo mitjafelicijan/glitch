@@ -308,12 +308,6 @@ void init_window_manager(void) {
 		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_mic_muted_fg);
 	}
 
-	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, widget_fg_color, &wm.xft_widget_color)) {
-		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to gray", widget_fg_color);
-		XRenderColor render_color = {0x8888, 0x8888, 0x8888, 0xFFFF};
-		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_widget_color);
-	}
-
 	wm.running = 1;
 
 	scan_windows();
