@@ -5,6 +5,8 @@ Glitch is a minimal X11 window manager controlled by keyboard shortcuts.
 > stability. Main purpose is to learn X11 and also to have a window manager that
 > is simple and that I can easily modify to my liking.
 
+<img width="2276" height="1380" alt="glitch" src="https://github.com/user-attachments/assets/03692400-303b-40fe-99e8-b134cc09d47e" />
+
 ## Key Features
 
 - **Window Movement**: Move windows by pixel values
