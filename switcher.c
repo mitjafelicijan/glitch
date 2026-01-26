@@ -3,9 +3,9 @@
 
 #include <X11/Xatom.h>
 #include <X11/Xproto.h>
+#include <X11/Xutil.h>
 
 #include "glitch.h"
-#include "config.h"
 
 extern WindowManager wm;
 
@@ -27,7 +27,6 @@ static void draw_switcher(void) {
 
 		// Draw box background
 		if (is_selected) {
-			// Use blue color for active background (wm.xft_bg_color is usually blue from config)
 			XSetForeground(wm.dpy, DefaultGC(wm.dpy, wm.screen), wm.xft_bg_color.pixel);
 			XFillRectangle(wm.dpy, wm.cycle_win, DefaultGC(wm.dpy, wm.screen), x_offset, y_offset, box_size, box_size);
 		} else {
@@ -35,30 +34,47 @@ static void draw_switcher(void) {
 			XFillRectangle(wm.dpy, wm.cycle_win, DefaultGC(wm.dpy, wm.screen), x_offset, y_offset, box_size, box_size);
 		}
 
-		// Draw Window Name
-		char *name = NULL;
-		Atom utf8_string = XInternAtom(wm.dpy, "UTF8_STRING", False);
-		if (XFetchName(wm.dpy, w, &name) || XGetWindowProperty(wm.dpy, w, XInternAtom(wm.dpy, "_NET_WM_NAME", False), 0, (~0L), False, utf8_string, &(Atom){0}, &(int){0}, &(unsigned long){0}, &(unsigned long){0}, (unsigned char **)&name) == Success) {
-			if (name) {
-				// Selected: White text. Unselected: Black text.
-				XftColor *color = is_selected ? &wm.xft_color : &wm.xft_root_bg_color;
-				// NOTE: wm.xft_color is "white" (indicator_fg_color), wm.xft_root_bg_color is "black".
-
-				XftDraw *draw = XftDrawCreate(wm.dpy, wm.cycle_win, DefaultVisual(wm.dpy, wm.screen), wm.cmap);
-				if (draw) {
-					if (strlen(name) > 8) {
-						char truncated[9];
-						strncpy(truncated, name, 8);
-						truncated[8] = '\0';
-						XftDrawStringUtf8(draw, color, wm.font, x_offset + 10, y_offset + 90, (const FcChar8 *)truncated, strlen(truncated));
-					} else {
-						XftDrawStringUtf8(draw, color, wm.font, x_offset + 10, y_offset + 90, (const FcChar8 *)name, strlen(name));
-					}
-					XftDrawDestroy(draw);
-				}
-				XFree(name);
+		// Get Program Name
+		char *prog_name = NULL;
+		XClassHint ch;
+		if (XGetClassHint(wm.dpy, w, &ch)) {
+			prog_name = ch.res_class;
+			if (prog_name) {
+				char *dash = strchr(prog_name, '-');
+				if (dash) *dash = '\0';
 			}
+			if (ch.res_name) XFree(ch.res_name);
 		}
+
+		// Get Window Title
+		char *win_title = NULL;
+		if (!XFetchName(wm.dpy, w, &win_title)) {
+			Atom utf8_string = XInternAtom(wm.dpy, "UTF8_STRING", False);
+			XGetWindowProperty(wm.dpy, w, XInternAtom(wm.dpy, "_NET_WM_NAME", False), 0, (~0L), False, utf8_string, &(Atom){0}, &(int){0}, &(unsigned long){0}, &(unsigned long){0}, (unsigned char **)&win_title);
+		}
+
+		XftDraw *draw = XftDrawCreate(wm.dpy, wm.cycle_win, DefaultVisual(wm.dpy, wm.screen), wm.cmap);
+		if (draw) {
+			XftColor *color = is_selected ? &wm.xft_color : &wm.xft_root_bg_color;
+
+			if (prog_name) {
+				char truncated[9];
+				strncpy(truncated, prog_name, 8);
+				truncated[8] = '\0';
+				XftDrawStringUtf8(draw, color, wm.font, x_offset + 10, y_offset + 70, (const FcChar8 *)truncated, strlen(truncated));
+			}
+
+			if (win_title) {
+				char truncated[9];
+				strncpy(truncated, win_title, 8);
+				truncated[8] = '\0';
+				XftDrawStringUtf8(draw, color, wm.font, x_offset + 10, y_offset + 90, (const FcChar8 *)truncated, strlen(truncated));
+			}
+			XftDrawDestroy(draw);
+		}
+
+		if (prog_name) XFree(prog_name);
+		if (win_title) XFree(win_title);
 
 		x_offset += box_size;
 	}

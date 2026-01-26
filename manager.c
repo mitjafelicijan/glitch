@@ -421,6 +421,7 @@ void deinit_window_manager(void) {
 	deinit_audio();
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_color);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_bg_color);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_root_bg_color);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_active_bg);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_muted_bg);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_active_fg);
