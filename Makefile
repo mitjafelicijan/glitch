@@ -22,7 +22,7 @@ config.h:
 	[ -f config.h ] || cp config.def.h config.h
 
 install: all
-	install -Dm755 glitch $(DESTDIR)/usr/local/bin/glitch
+	install -Dm755 glitch $(DESTDIR)/bin/glitch
 
 clean:
 	rm -f glitch
