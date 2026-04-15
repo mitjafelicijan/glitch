@@ -56,6 +56,11 @@ typedef struct Client {
 } Client;
 
 typedef struct {
+	char *name;
+	char *exec;
+} LauncherItem;
+
+typedef struct {
 	Display *dpy;
 	Window root;
 	Window active;
@@ -76,6 +81,7 @@ typedef struct {
 
 	unsigned int current_desktop;
 	XftFont *font;
+	XftFont *launcher_font;
 	XftDraw *xft_draw;
 	XftColor xft_color;
 	XftColor xft_bg_color;
@@ -89,6 +95,12 @@ typedef struct {
 	XftColor xft_layout_float_bg;
 	XftColor xft_layout_tile_fg;
 	XftColor xft_layout_float_fg;
+
+	XftColor xft_launcher_bg;
+	XftColor xft_launcher_border;
+	XftColor xft_launcher_fg;
+	XftColor xft_launcher_hl_bg;
+	XftColor xft_launcher_hl_fg;
 
 	unsigned long last_widget_update;
 	Client *clients;
@@ -106,6 +118,16 @@ typedef struct {
 	pa_threaded_mainloop *pa_mainloop;
 	pa_context *pa_ctx;
 	int mic_muted;
+
+	// Launcher
+	int launcher_active;
+	Window launcher_win;
+	LauncherItem *launcher_items;
+	int launcher_items_count;
+	LauncherItem **launcher_filtered;
+	int launcher_filtered_count;
+	char launcher_search[256];
+	int launcher_selected;
 } WindowManager;
 
 typedef struct {
@@ -196,5 +218,9 @@ void toggle_mic_mute(const Arg *arg);
 
 void apply_tiling_layout(void);
 void toggle_layout(const Arg *arg);
+
+void toggle_launcher(const Arg *arg);
+void launcher_handle_key(void);
+void launcher_draw(void);
 
 #endif // GLITCH_H

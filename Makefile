@@ -15,7 +15,7 @@ endif
 
 all: glitch
 
-glitch: main.c logging.c manager.c widgets.c switcher.c audio.c
+glitch: main.c logging.c manager.c widgets.c switcher.c audio.c launcher.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
 config.h:

@@ -21,6 +21,7 @@ static const char *on_top_active_border_color = "orange";
 static const char *on_top_inactive_border_color = "darkorange";
 
 static const char *widget_font = "Berkeley Mono:size=7:bold";
+static const char *launcher_font_name = "Berkeley Mono:size=9:bold";
 static const char *time_format = "%A %d.%m.%Y %H:%M:%S";
 static const char *indicator_fg_color = "white";
 static const char *indicator_bg_color = "blue";
@@ -33,12 +34,19 @@ static const char *layout_float_bg_color = "#333333";
 static const char *layout_tile_fg_color = "white";
 static const char *layout_float_fg_color = "white";
 
+static const char *launcher_bg_color = "black";
+static const char *launcher_border_color = "khaki";
+static const char *launcher_fg_color = "white";
+static const char *launcher_hl_bg_color = "khaki";
+static const char *launcher_hl_fg_color = "black";
+static int launcher_width = 800;
+static int launcher_height = 600;
+
 static Shortcut shortcuts[] = {
 	/* Mask                 KeySym                    Shell command */
-	{ MODKEY,               XK_Return,                "st -f \"Berkeley Mono:style=Bold:size=10\" -g 80x40" },
-	{ MODKEY,               XK_p,                     "rofi -show drun -theme ~/.black.rasi" },
+	{ MODKEY,               XK_Return,                "alacritty" },
 	{ ControlMask,          XK_Escape,                "sh -c 'maim -s | xclip -selection clipboard -t image/png'" },
-	{ MODKEY,               XK_w,                     "/home/m/Applications/brave --new-window" },
+	{ MODKEY,               XK_w,                     "brave --new-window" },
 	{ MODKEY,               XK_e,                     "thunar" },
 	{ MODKEY,               XK_s,                     "xmagnify -s 1000 -z 3" },
 	{ MODKEY,               XK_r,                     "simplescreenrecorder" },
@@ -92,6 +100,7 @@ static Keybinds keybinds[] = {
 	{ MODKEY,               XK_c,       center_window,       { 0 }        },
 	{ MODKEY,               XK_m,       toggle_mic_mute,     { 0 }        },
 	{ MODKEY,               XK_space,   toggle_layout,       { 0 }        },
+	{ MODKEY,               XK_p,       toggle_launcher,     { 0 }        },
 	{ MODKEY | ShiftMask,   XK_q,       quit,                { 0 }        },
 	{ MODKEY,               XK_q,       close_window,        { 0 }        },
 };

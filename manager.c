@@ -317,6 +317,12 @@ void init_window_manager(void) {
 		wm.font = XftFontOpenName(wm.dpy, wm.screen, "fixed");
 	}
 
+	wm.launcher_font = XftFontOpenName(wm.dpy, wm.screen, launcher_font_name);
+	if (!wm.launcher_font) {
+		log_message(stdout, LOG_WARNING, "Failed to load launcher font %s, falling back to fixed", launcher_font_name);
+		wm.launcher_font = XftFontOpenName(wm.dpy, wm.screen, "fixed");
+	}
+
 	Visual *visual = DefaultVisual(wm.dpy, wm.screen);
 
 	// Create XftDraw for the root window.
@@ -384,6 +390,27 @@ void init_window_manager(void) {
 		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to white", layout_float_fg_color);
 		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_layout_float_fg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, launcher_bg_color, &wm.xft_launcher_bg)) {
+		XRenderColor render_color = {0x0000, 0x0000, 0x0000, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_launcher_bg);
+	}
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, launcher_border_color, &wm.xft_launcher_border)) {
+		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_launcher_border);
+	}
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, launcher_fg_color, &wm.xft_launcher_fg)) {
+		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_launcher_fg);
+	}
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, launcher_hl_bg_color, &wm.xft_launcher_hl_bg)) {
+		XRenderColor render_color = {0x8000, 0x8000, 0x0000, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_launcher_hl_bg);
+	}
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, launcher_hl_fg_color, &wm.xft_launcher_hl_fg)) {
+		XRenderColor render_color = {0x0000, 0x0000, 0x0000, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_launcher_hl_fg);
 	}
 
 	wm.running = 1;
@@ -488,9 +515,27 @@ void deinit_window_manager(void) {
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_muted_bg);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_active_fg);
 	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_mic_muted_fg);
+
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_launcher_bg);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_launcher_border);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_launcher_fg);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_launcher_hl_bg);
+	XftColorFree(wm.dpy, DefaultVisual(wm.dpy, wm.screen), wm.cmap, &wm.xft_launcher_hl_fg);
+
 	XftDrawDestroy(wm.xft_draw);
 
+	if (wm.launcher_win) XDestroyWindow(wm.dpy, wm.launcher_win);
+	if (wm.launcher_items) {
+		for (int i = 0; i < wm.launcher_items_count; i++) {
+			free(wm.launcher_items[i].name);
+			free(wm.launcher_items[i].exec);
+		}
+		free(wm.launcher_items);
+	}
+	if (wm.launcher_filtered) free(wm.launcher_filtered);
+
 	XftFontClose(wm.dpy, wm.font);
+	XftFontClose(wm.dpy, wm.launcher_font);
 	XFreeCursor(wm.dpy, wm.cursor_default);
 	XFreeCursor(wm.dpy, wm.cursor_move);
 	XFreeCursor(wm.dpy, wm.cursor_resize);
@@ -1062,6 +1107,11 @@ void handle_button_release(void) {
 
 // https://tronche.com/gui/x/xlib/events/keyboard-pointer/keyboard-pointer.html
 void handle_key_press(void) {
+	if (wm.launcher_active) {
+		launcher_handle_key();
+		return;
+	}
+
 	log_message(stdout, LOG_DEBUG, ">> Key pressed > active window 0x%lx", wm.ev.xkey.subwindow);
 	if (wm.ev.type != KeyPress) return;
 
