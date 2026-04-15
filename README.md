@@ -16,12 +16,17 @@ Glitch is a minimal X11 window manager controlled by keyboard shortcuts.
 - **Maximization**: Vertical and horizontal maximization
 - **Edge Snapping**: Snap windows to screen edges
 - **Window Centering**: Center windows on screen
+- **Audio Control**: Toggle microphone mute with on-screen status
+- **Tiling Layout**: Toggle between floating and tiling layouts per desktop
+- **On-screen Indicators**: Live status for desktop, layout, mic, and clock
 - **Live Reload**: Reload configuration without restart
 
 ## Technical Details
 
 - Built on X11/Xlib for low-level window management
 - Uses EWMH (Extended Window Manager Hints) for fullscreen and state functionality
+- Integrated PulseAudio support for real-time microphone status tracking
+- Xft-based on-screen widgets for system status (Clock, Mic, Layout, Desktop)
 - Maintains state for maximized windows to enable toggle behavior
 - Implements proper X11 event handling and window attribute management
 
@@ -31,13 +36,15 @@ Glitch is a minimal X11 window manager controlled by keyboard shortcuts.
 - GNU Make
 - pkg-config
 - X11 and Freetype development libraries
+- libXft development library
+- PulseAudio development library
 
 ### Installing Dependencies
 
 **Void Linux:**
 
 ```sh
-sudo xbps-install libX11-devel freetype-devel pkg-config
+sudo xbps-install libX11-devel freetype-devel libXft-devel pulseaudio-devel pkg-config
 ```
 
 ## Compilation
@@ -174,11 +181,14 @@ Modifier key: `Mod4` (Super/Windows key)
 ```c
 { MODKEY,               XK_f,       toggle_fullscreen,   { 0 } },
 { MODKEY,               XK_q,       close_window,        { 0 } },
+{ MODKEY,               XK_m,       toggle_mic_mute,     { 0 } },
+{ MODKEY,               XK_space,   toggle_layout,       { 0 } },
 { MODKEY | ShiftMask,   XK_q,       quit,                { 0 } },
 { MODKEY | ShiftMask,   XK_r,       reload,              { 0 } },
 { MODKEY | ShiftMask,   XK_s,       toggle_pip,          { 0 } },
 { MODKEY | ShiftMask,   XK_t,       toggle_always_on_top,{ 0 } },
 { Mod1Mask,             XK_Tab,     cycle_active_window, { .i = 0 } },
+{ Mod1Mask | ShiftMask, XK_Tab,     cycle_active_window, { .i = 1 } },
 ```
 
 #### Window Maximization
@@ -205,6 +215,8 @@ Defined in `shortcuts[]` array:
 - `Mod+w`: Browser (brave)
 - `Mod+e`: File Manager (thunar)
 - `Mod+s`: Screen magnifier (xmagnify)
+- `Mod+r`: Screen recorder (SSR)
+- `Mod+l`: Screen lock (xlock)
 - `Control+Escape`: Screenshot (maim)
 
 ## Function Reference
@@ -230,4 +242,6 @@ Defined in `shortcuts[]` array:
 | `toggle_always_on_top` | Control | None | Toggle Always-on-Top status |
 | `window_hmaximize` | Maximize | None | Toggle horizontal maximize |
 | `window_vmaximize` | Maximize | None | Toggle vertical maximize |
+| `toggle_mic_mute` | Audio | None | Toggle microphone mute state |
+| `toggle_layout` | Layout | None | Toggle between floating/tiling |
 | `reload` | System | None | Reload configuration/restart WM |
