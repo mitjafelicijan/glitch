@@ -109,7 +109,7 @@ void cycle_active_window(const Arg *arg) {
 		// We grab it on the root window. 
 		XGrabKeyboard(wm.dpy, wm.root, True, GrabModeAsync, GrabModeAsync, CurrentTime);
 
-		// Count clients
+		// Count clients - allocate extra to handle new windows mapping during this process
 		int count = 0;
 		Client *c = wm.clients;
 		while (c) {
@@ -122,7 +122,7 @@ void cycle_active_window(const Arg *arg) {
 			return;
 		}
 
-		wm.cycle_clients = malloc(sizeof(Window) * count);
+		wm.cycle_clients = malloc(sizeof(Window) * (count + 10));
 		wm.cycle_count = 0;
 		wm.active_cycle_index = 0;
 

@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
 	while(wm.running) {
 		XNextEvent(wm.dpy, &wm.ev);
 
+		XLockDisplay(wm.dpy);
 		switch (wm.ev.type) {
 			case MapRequest:
 				handle_map_request();
@@ -116,6 +117,7 @@ int main(int argc, char *argv[]) {
 				handle_configure_request();
 				break;
 		}
+		XUnlockDisplay(wm.dpy);
 	}
 
 	deinit_window_manager();

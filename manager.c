@@ -586,7 +586,11 @@ void handle_configure_request(void) {
 	changes.sibling = ev->above;
 	changes.stack_mode = ev->detail;
 
+	XErrorHandler old = XSetErrorHandler(ignore_x_error);
 	XConfigureWindow(wm.dpy, ev->window, ev->value_mask, &changes);
+	XSync(wm.dpy, False);
+	XSetErrorHandler(old);
+
 	log_message(stdout, LOG_DEBUG, "ConfigureRequest for 0x%lx (x=%d, y=%d, w=%d, h=%d)", ev->window, ev->x, ev->y, ev->width, ev->height);
 }
 
@@ -594,6 +598,8 @@ void handle_configure_request(void) {
 void handle_map_request(void) {
 	Window window = wm.ev.xmaprequest.window;
 	if (window == wm.root) return;
+
+	XErrorHandler old = XSetErrorHandler(ignore_x_error);
 
 	// Move window under cursor position and clamps inside the screen bounds.
 	XWindowAttributes check_attr;
@@ -635,6 +641,10 @@ void handle_map_request(void) {
 	grab_buttons(window);
 
 	add_client(window);
+	
+	XSync(wm.dpy, False);
+	XSetErrorHandler(old);
+
 	log_message(stdout, LOG_DEBUG, "Window 0x%lx mapped and grabbed on desktop %d", window, wm.current_desktop);
 	redraw_widgets();
 	update_client_list();
@@ -972,10 +982,10 @@ void handle_button_release(void) {
 	if (wm.start.subwindow != None && (wm.start.state & MODKEY)) {
 		XDefineCursor(wm.dpy, wm.start.subwindow, None);
 
-		// Restore default error handler
-		XSetErrorHandler(NULL);
+		// Restore window manager error handler
+		XSetErrorHandler(x_error_handler);
 
-		log_message(stdout, LOG_DEBUG, "Restored default cursor on window 0x%lx", wm.start.subwindow);
+		log_message(stdout, LOG_DEBUG, "Restored window manager cursor on window 0x%lx", wm.start.subwindow);
 		wm.start.subwindow = None;
 	}
 
