@@ -18,6 +18,7 @@ Glitch is a minimal X11 window manager controlled by keyboard shortcuts.
 - **Window Centering**: Center windows on screen
 - **Audio Control**: Toggle microphone mute with on-screen status
 - **Tiling Layout**: Toggle between floating and tiling layouts per desktop
+- **Application Launcher**: Integrated .desktop-aware launcher with usage-based sorting
 - **On-screen Indicators**: Live status for desktop, layout, mic, and clock
 - **Live Reload**: Reload configuration without restart
 
@@ -26,6 +27,8 @@ Glitch is a minimal X11 window manager controlled by keyboard shortcuts.
 - Built on X11/Xlib for low-level window management
 - Uses EWMH (Extended Window Manager Hints) for fullscreen and state functionality
 - Integrated PulseAudio support for real-time microphone status tracking
+- Uses GIO/GLib for standard-compliant .desktop file parsing and application discovery
+- Persistent usage tracking for applications to provide "most used" sorting
 - Xft-based on-screen widgets for system status (Clock, Mic, Layout, Desktop)
 - Maintains state for maximized windows to enable toggle behavior
 - Implements proper X11 event handling and window attribute management
@@ -38,13 +41,14 @@ Glitch is a minimal X11 window manager controlled by keyboard shortcuts.
 - X11 and Freetype development libraries
 - libXft development library
 - PulseAudio development library
+- GLib/GIO development libraries
 
 ### Installing Dependencies
 
 **Void Linux:**
 
 ```sh
-sudo xbps-install libX11-devel freetype-devel libXft-devel pulseaudio-devel pkg-config
+sudo xbps-install libX11-devel freetype-devel libXft-devel pulseaudio-devel glib-devel pkg-config
 ```
 
 ## Compilation
@@ -182,6 +186,7 @@ Modifier key: `Mod4` (Super/Windows key)
 { MODKEY,               XK_f,       toggle_fullscreen,   { 0 } },
 { MODKEY,               XK_q,       close_window,        { 0 } },
 { MODKEY,               XK_m,       toggle_mic_mute,     { 0 } },
+{ MODKEY,               XK_p,       toggle_launcher,     { 0 } },
 { MODKEY,               XK_space,   toggle_layout,       { 0 } },
 { MODKEY | ShiftMask,   XK_q,       quit,                { 0 } },
 { MODKEY | ShiftMask,   XK_r,       reload,              { 0 } },
@@ -211,7 +216,7 @@ Modifier key: `Mod4` (Super/Windows key)
 
 Defined in `shortcuts[]` array:
 - `Mod+Return`: Terminal (st)
-- `Mod+p`: Application launcher (rofi)
+- `Mod+p`: Internal application launcher
 - `Mod+w`: Browser (brave)
 - `Mod+e`: File Manager (thunar)
 - `Mod+s`: Screen magnifier (xmagnify)
@@ -243,5 +248,6 @@ Defined in `shortcuts[]` array:
 | `window_hmaximize` | Maximize | None | Toggle horizontal maximize |
 | `window_vmaximize` | Maximize | None | Toggle vertical maximize |
 | `toggle_mic_mute` | Audio | None | Toggle microphone mute state |
+| `toggle_launcher` | Control | None | Toggle integrated app launcher |
 | `toggle_layout` | Layout | None | Toggle between floating/tiling |
 | `reload` | System | None | Reload configuration/restart WM |

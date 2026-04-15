@@ -10,6 +10,7 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 
+#include <sys/stat.h>
 #include <gio/gio.h>
 
 #include "glitch.h"
@@ -18,6 +19,47 @@
 extern WindowManager wm;
 
 static void launcher_filter(void);
+
+static int compare_launcher_items(const void *a, const void *b) {
+	const LauncherItem *ia = (const LauncherItem *)a;
+	const LauncherItem *ib = (const LauncherItem *)b;
+	if (ib->usage != ia->usage)
+		return ib->usage - ia->usage;
+	return strcasecmp(ia->name, ib->name);
+}
+
+static void load_usage(void) {
+	char path[1024];
+	char *home = getenv("HOME");
+	if (!home) return;
+	snprintf(path, sizeof(path), "%s/.cache/glitch/usage.db", home);
+
+	GKeyFile *kf = g_key_file_new();
+	if (g_key_file_load_from_file(kf, path, G_KEY_FILE_NONE, NULL)) {
+		for (int i = 0; i < wm.launcher_items_count; i++) {
+			wm.launcher_items[i].usage = g_key_file_get_integer(kf, "Usage", wm.launcher_items[i].exec, NULL);
+		}
+	}
+	g_key_file_free(kf);
+}
+
+static void record_usage(const char *exec) {
+	char path[1024];
+	char *home = getenv("HOME");
+	if (!home) return;
+	snprintf(path, sizeof(path), "%s/.cache/glitch", home);
+	mkdir(path, 0755);
+	snprintf(path, sizeof(path), "%s/.cache/glitch/usage.db", home);
+
+	GKeyFile *kf = g_key_file_new();
+	g_key_file_load_from_file(kf, path, G_KEY_FILE_NONE, NULL);
+
+	int count = g_key_file_get_integer(kf, "Usage", exec, NULL);
+	g_key_file_set_integer(kf, "Usage", exec, count + 1);
+
+	g_key_file_save_to_file(kf, path, NULL);
+	g_key_file_free(kf);
+}
 
 static void load_applications(void) {
 	if (wm.launcher_items) {
@@ -47,8 +89,10 @@ static void load_applications(void) {
 
 		if (name && exec) {
 			wm.launcher_items[wm.launcher_items_count].name = strdup(name);
+			wm.launcher_items[wm.launcher_items_count].usage = 0;
 
 			char *e = strdup(exec);
+
 			char *percent = strchr(e, '%');
 			if (percent) *percent = '\0';
 
@@ -66,6 +110,9 @@ static void load_applications(void) {
 		g_object_unref(app);
 	}
 	g_list_free(apps);
+
+	load_usage();
+	qsort(wm.launcher_items, wm.launcher_items_count, sizeof(LauncherItem), compare_launcher_items);
 }
 
 void toggle_launcher(const Arg *arg) {
@@ -77,7 +124,10 @@ void toggle_launcher(const Arg *arg) {
 		return;
 	}
 
-	if (!wm.launcher_items) {
+	if (wm.launcher_items) {
+		load_usage();
+		qsort(wm.launcher_items, wm.launcher_items_count, sizeof(LauncherItem), compare_launcher_items);
+	} else {
 		load_applications();
 	}
 
@@ -143,6 +193,7 @@ void launcher_handle_key(void) {
 		}
 	} else if (keysym == XK_Return) {
 		if (wm.launcher_filtered_count > 0 && wm.launcher_selected < wm.launcher_filtered_count) {
+			record_usage(wm.launcher_filtered[wm.launcher_selected]->exec);
 			execute_shortcut(wm.launcher_filtered[wm.launcher_selected]->exec);
 			toggle_launcher(NULL);
 			return;

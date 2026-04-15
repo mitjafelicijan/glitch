@@ -58,6 +58,7 @@ typedef struct Client {
 typedef struct {
 	char *name;
 	char *exec;
+	int usage;
 } LauncherItem;
 
 typedef struct {
