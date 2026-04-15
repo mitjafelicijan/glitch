@@ -1,7 +1,7 @@
 CC           ?= clang
 CFLAGS       := -std=c99 -pedantic -Wall -Wextra -Wunused -Wswitch-enum
-INCLUDES     := $(shell pkg-config --cflags xft libpulse)
-LDFLAGS      := $(shell pkg-config --libs x11 xft libpulse) -lpthread
+INCLUDES     := $(shell pkg-config --cflags xft libpulse gio-2.0 gio-unix-2.0)
+LDFLAGS      := $(shell pkg-config --libs x11 xft libpulse gio-2.0 gio-unix-2.0) -lpthread
 DESTDIR      ?= /usr/local
 DISPLAY_NUM  := 69
 

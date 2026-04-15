@@ -10,6 +10,8 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 
+#include <gio/gio.h>
+
 #include "glitch.h"
 #include "config.h"
 
@@ -17,28 +19,7 @@ extern WindowManager wm;
 
 static void launcher_filter(void);
 
-static char *trim_whitespace(char *str) {
-	char *end;
-	while (isspace((unsigned char)*str)) str++;
-	if (*str == 0) return str;
-	end = str + strlen(str) - 1;
-	while (end > str && isspace((unsigned char)*end)) end--;
-	end[1] = '\0';
-	return str;
-}
-
 static void load_applications(void) {
-	const char *system_dirs[] = {
-		"/usr/share/applications",
-		"/usr/local/share/applications"
-	};
-
-	char home_dir[1024];
-	char *home = getenv("HOME");
-	if (home) {
-		snprintf(home_dir, sizeof(home_dir), "%s/.local/share/applications", home);
-	}
-
 	if (wm.launcher_items) {
 		for (int i = 0; i < wm.launcher_items_count; i++) {
 			free(wm.launcher_items[i].name);
@@ -49,78 +30,42 @@ static void load_applications(void) {
 		wm.launcher_items_count = 0;
 	}
 
-	int capacity = 100;
-	wm.launcher_items = malloc(sizeof(LauncherItem) * capacity);
+	GList *apps = g_app_info_get_all();
+	int total_apps = g_list_length(apps);
+	wm.launcher_items = malloc(sizeof(LauncherItem) * total_apps);
 
-	for (int d = -1; d < (int)LENGTH(system_dirs); d++) {
-		const char *path_to_open;
-		if (d == -1) {
-			if (!home) continue;
-			path_to_open = home_dir;
-		} else {
-			path_to_open = system_dirs[d];
+	for (GList *l = apps; l != NULL; l = l->next) {
+		GAppInfo *app = (GAppInfo *)l->data;
+
+		if (!g_app_info_should_show(app)) {
+			g_object_unref(app);
+			continue;
 		}
 
-		DIR *dir = opendir(path_to_open);
-		if (!dir) continue;
+		const char *name = g_app_info_get_name(app);
+		const char *exec = g_app_info_get_commandline(app);
 
-		struct dirent *entry;
-		while ((entry = readdir(dir))) {
-			if (strstr(entry->d_name, ".desktop")) {
-				char desktop_path[2048];
-				snprintf(desktop_path, sizeof(desktop_path), "%s/%s", path_to_open, entry->d_name);
+		if (name && exec) {
+			wm.launcher_items[wm.launcher_items_count].name = strdup(name);
 
-				FILE *f = fopen(desktop_path, "r");
-				if (!f) continue;
+			char *e = strdup(exec);
+			char *percent = strchr(e, '%');
+			if (percent) *percent = '\0';
 
-				char line[1024];
-				char *name = NULL;
-				char *exec = NULL;
-				int no_display = 0;
-				int in_desktop_entry = 0;
-
-				while (fgets(line, sizeof(line), f)) {
-					char *trimmed = trim_whitespace(line);
-					if (trimmed[0] == '[' && strstr(trimmed, "[Desktop Entry]")) {
-						in_desktop_entry = 1;
-						continue;
-					}
-					if (trimmed[0] == '[' && !strstr(trimmed, "[Desktop Entry]")) {
-						in_desktop_entry = 0;
-					}
-
-					if (!in_desktop_entry) continue;
-
-					if (strncmp(trimmed, "Name=", 5) == 0 && !name) {
-						name = strdup(trim_whitespace(trimmed + 5));
-					} else if (strncmp(trimmed, "Exec=", 5) == 0 && !exec) {
-						char *e = strdup(trimmed + 5);
-						char *percent = strchr(e, '%');
-						if (percent) *percent = '\0';
-						exec = strdup(trim_whitespace(e));
-						free(e);
-					} else if (strncmp(trimmed, "NoDisplay=true", 14) == 0) {
-						no_display = 1;
-					}
-				}
-				fclose(f);
-
-				if (name && exec && !no_display) {
-					if (wm.launcher_items_count >= capacity) {
-						capacity *= 2;
-						wm.launcher_items = realloc(wm.launcher_items, sizeof(LauncherItem) * capacity);
-					}
-					wm.launcher_items[wm.launcher_items_count].name = name;
-					wm.launcher_items[wm.launcher_items_count].exec = exec;
-					wm.launcher_items_count++;
-				} else {
-					if (name) free(name);
-					if (exec) free(exec);
-				}
+			// Trim potential trailing space after removing %
+			int len = strlen(e);
+			while (len > 0 && isspace((unsigned char)e[len-1])) {
+				e[--len] = '\0';
 			}
+
+			wm.launcher_items[wm.launcher_items_count].exec = strdup(e);
+			free(e);
+
+			wm.launcher_items_count++;
 		}
-		closedir(dir);
+		g_object_unref(app);
 	}
+	g_list_free(apps);
 }
 
 void toggle_launcher(const Arg *arg) {
