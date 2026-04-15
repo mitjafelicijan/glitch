@@ -37,6 +37,58 @@ static Atom WM_DELETE_WINDOW;
 static Atom WM_TAKE_FOCUS;
 static Atom _NET_SUPPORTED;
 
+static void update_window_border(Window window, int active) {
+	if (window == None) return;
+	if (!window_exists(window)) return;
+
+	Atom actual_type;
+	int actual_format;
+	unsigned long nitems, bytes_after;
+	unsigned char *prop = NULL;
+	int has_decorations = 1;
+
+	// Check _MOTIF_WM_HINTS to see if the window requested no decorations
+	XErrorHandler old = XSetErrorHandler(ignore_x_error);
+	int status = XGetWindowProperty(wm.dpy, window, _MOTIF_WM_HINTS, 0, 5, False, AnyPropertyType,
+			&actual_type, &actual_format, &nitems, &bytes_after, &prop);
+	XSync(wm.dpy, False);
+	XSetErrorHandler(old);
+
+	if (status == Success) {
+		if (prop && nitems >= 3) {
+			unsigned long flags = ((unsigned long *)prop)[0];
+			unsigned long decorations = ((unsigned long *)prop)[2];
+			// If flags bit 1 is set (MWM_HINTS_DECORATIONS) and decorations bit 0 is cleared (MWM_DECOR_ALL/BORDER), then no border.
+			// Simplification: if decorations is 0, assume no border.
+			if ((flags & 2) && (decorations & 1) == 0) {
+				has_decorations = 0;
+			}
+		}
+		if (prop) XFree(prop);
+	}
+
+	unsigned int bw = has_decorations ? border_size : 0;
+	XSetWindowBorderWidth(wm.dpy, window, bw);
+
+	if (active) {
+		if (is_always_on_top(window)) {
+			XSetWindowBorder(wm.dpy, window, wm.borders.on_top_active);
+		} else if (is_sticky(window)) {
+			XSetWindowBorder(wm.dpy, window, wm.borders.sticky_active);
+		} else {
+			XSetWindowBorder(wm.dpy, window, wm.borders.normal_active);
+		}
+	} else {
+		if (is_always_on_top(window)) {
+			XSetWindowBorder(wm.dpy, window, wm.borders.on_top_inactive);
+		} else if (is_sticky(window)) {
+			XSetWindowBorder(wm.dpy, window, wm.borders.sticky_inactive);
+		} else {
+			XSetWindowBorder(wm.dpy, window, wm.borders.normal_inactive);
+		}
+	}
+}
+
 static void update_wm_state(Window w, Atom state_atom, int add);
 static int has_wm_state(Window w, Atom state_atom);
 static void check_and_clear_maximized_state(Window w, int horizontal, int vertical);
@@ -140,15 +192,7 @@ static void scan_windows(void) {
 				add_client(wins[i]);
 				XSelectInput(wm.dpy, wins[i], EnterWindowMask | LeaveWindowMask);
 				grab_buttons(wins[i]);
-
-				XSetWindowBorderWidth(wm.dpy, wins[i], border_size);
-				if (is_sticky(wins[i])) {
-					XSetWindowBorder(wm.dpy, wins[i], wm.borders.sticky_inactive);
-				} else if (is_always_on_top(wins[i])) {
-					XSetWindowBorder(wm.dpy, wins[i], wm.borders.on_top_inactive);
-				} else {
-					XSetWindowBorder(wm.dpy, wins[i], wm.borders.normal_inactive);
-				}
+				update_window_border(wins[i], 0);
 			}
 		}
 		if (wins) XFree(wins);
@@ -339,8 +383,6 @@ void init_window_manager(void) {
 
 	wm.running = 1;
 
-	scan_windows();
-
 	// Grab keys for keybinds.
 	for (unsigned int i = 0; i < LENGTH(keybinds); i++) {
 		KeyCode keycode = XKeysymToKeycode(wm.dpy, keybinds[i].keysym);
@@ -399,24 +441,10 @@ void init_window_manager(void) {
 		wm.borders.on_top_inactive = on_top_inactive.pixel;
 	}
 
-	// Scan for existing windows.
-	unsigned int nchildren;
-	Window root_return, parent_return, *children;
-	XWindowAttributes wa;
+	// Scan for existing windows and apply initial layout.
+	scan_windows();
+	apply_tiling_layout();
 
-	if (XQueryTree(wm.dpy, wm.root, &root_return, &parent_return, &children, &nchildren)) {
-		for (unsigned int i = 0; i < nchildren; i++) {
-			if (!XGetWindowAttributes(wm.dpy, children[i], &wa) || wa.override_redirect)
-				continue;
-			if (wa.map_state == IsViewable) {
-				grab_buttons(children[i]);
-				XSelectInput(wm.dpy, children[i], EnterWindowMask | LeaveWindowMask);
-				add_client(children[i]);
-				log_message(stdout, LOG_DEBUG, "Grabbed existing window 0x%lx", children[i]);
-			}
-		}
-		if (children) XFree(children);
-	}
 	redraw_widgets();
 	update_client_list();
 	init_audio();
@@ -1115,75 +1143,14 @@ void set_active_border(Window window) {
 	if (window == None) return;
 	if (!window_exists(window)) return;
 
-	Atom actual_type;
-	int actual_format;
-	unsigned long nitems, bytes_after;
-	unsigned char *prop = NULL;
-	int has_decorations = 1;
-
-	// Check _MOTIF_WM_HINTS to see if the window requested no decorations
-	XErrorHandler old = XSetErrorHandler(ignore_x_error);
-	int status = XGetWindowProperty(wm.dpy, window, _MOTIF_WM_HINTS, 0, 5, False, AnyPropertyType,
-			&actual_type, &actual_format, &nitems, &bytes_after, &prop);
-	XSync(wm.dpy, False);
-	XSetErrorHandler(old);
-
-	if (status == Success) {
-		if (prop && nitems >= 3) {
-			unsigned long flags = ((unsigned long *)prop)[0];
-			unsigned long decorations = ((unsigned long *)prop)[2];
-			// If flags bit 1 is set (MWM_HINTS_DECORATIONS) and decorations bit 0 is cleared (MWM_DECOR_ALL/BORDER), then no border.
-			// Simplification: if decorations is 0, assume no border.
-			if ((flags & 2) && (decorations & 1) == 0) {
-				has_decorations = 0;
-			}
-		}
-		if (prop) XFree(prop);
-	}
-
-	unsigned int bw = has_decorations ? border_size : 0;
-
 	// Setting current active window to inactive.
-	if (wm.active != None) {
-		// For safety/speed, let's re-check hints for the old active window too.
-		int old_has_decorations = 1;
-
-		old = XSetErrorHandler(ignore_x_error);
-		status = XGetWindowProperty(wm.dpy, wm.active, _MOTIF_WM_HINTS, 0, 5, False, AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
-		XSync(wm.dpy, False);
-		XSetErrorHandler(old);
-
-		if (status == Success) {
-			if (prop && nitems >= 3) {
-				unsigned long flags = ((unsigned long *)prop)[0];
-				unsigned long decorations = ((unsigned long *)prop)[2];
-				if ((flags & 2) && (decorations & 1) == 0) {
-					old_has_decorations = 0;
-				}
-			}
-			if (prop) XFree(prop);
-		}
-
-		XSetWindowBorderWidth(wm.dpy, wm.active, old_has_decorations ? border_size : 0);
-		if (is_always_on_top(wm.active)) {
-			XSetWindowBorder(wm.dpy, wm.active, wm.borders.on_top_inactive);
-		} else if (is_sticky(wm.active)) {
-			XSetWindowBorder(wm.dpy, wm.active, wm.borders.sticky_inactive);
-		} else {
-			XSetWindowBorder(wm.dpy, wm.active, wm.borders.normal_inactive);
-		}
+	if (wm.active != None && wm.active != window) {
+		update_window_border(wm.active, 0);
 		log_message(stdout, LOG_DEBUG, "Active window 0x%lx border set to inactive", wm.active);
 	}
 
 	// Setting desired window to active.
-	XSetWindowBorderWidth(wm.dpy, window, bw);
-	if (is_always_on_top(window)) {
-		XSetWindowBorder(wm.dpy, window, wm.borders.on_top_active);
-	} else if (is_sticky(window)) {
-		XSetWindowBorder(wm.dpy, window, wm.borders.sticky_active);
-	} else {
-		XSetWindowBorder(wm.dpy, window, wm.borders.normal_active);
-	}
+	update_window_border(window, 1);
 	XFlush(wm.dpy);
 
 	log_message(stdout, LOG_DEBUG, "Desired window 0x%lx border set to active", window);
