@@ -30,7 +30,7 @@ static const char *mic_muted_bg_color = "#222222";
 static const char *mic_active_fg_color = "white";
 static const char *mic_muted_fg_color = "white";
 static const char *layout_tile_bg_color = "darkgreen";
-static const char *layout_float_bg_color = "#333333";
+static const char *layout_float_bg_color = "#222222";
 static const char *layout_tile_fg_color = "white";
 static const char *layout_float_fg_color = "white";
 

@@ -124,12 +124,7 @@ void toggle_launcher(const Arg *arg) {
 		return;
 	}
 
-	if (wm.launcher_items) {
-		load_usage();
-		qsort(wm.launcher_items, wm.launcher_items_count, sizeof(LauncherItem), compare_launcher_items);
-	} else {
-		load_applications();
-	}
+	load_applications();
 
 	wm.launcher_active = 1;
 	wm.launcher_search[0] = '\0';
