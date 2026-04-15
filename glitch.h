@@ -32,6 +32,11 @@ typedef enum {
 	LOG_ERROR,
 } LogLevel;
 
+typedef enum {
+	LAYOUT_FLOATING,
+	LAYOUT_TILING,
+} LayoutMode;
+
 typedef struct {
 	unsigned long normal_active;
 	unsigned long normal_inactive;
@@ -77,15 +82,22 @@ typedef struct {
 	XftColor xft_mic_muted_bg;
 	XftColor xft_mic_active_fg;
 	XftColor xft_mic_muted_fg;
-	
+	XftColor xft_layout_tile_bg;
+	XftColor xft_layout_float_bg;
+	XftColor xft_layout_tile_fg;
+	XftColor xft_layout_float_fg;
+
 	unsigned long last_widget_update;
 	Client *clients;
-	
+
 	int is_cycling;
 	Window cycle_win;
 	Window *cycle_clients;
 	int cycle_count;
 	int active_cycle_index;
+
+	// Layout management
+	LayoutMode layout_modes[NUM_DESKTOPS + 1]; // 1-indexed for convenience
 
 	// PulseAudio
 	pa_threaded_mainloop *pa_mainloop;
@@ -172,10 +184,14 @@ void center_window(const Arg *arg);
 void widget_desktop_indicator(void);
 void widget_datetime(void);
 void widget_mic_indicator(void);
+void widget_layout_indicator(void);
 void redraw_widgets(void);
 
 void init_audio(void);
 void deinit_audio(void);
 void toggle_mic_mute(const Arg *arg);
+
+void apply_tiling_layout(void);
+void toggle_layout(const Arg *arg);
 
 #endif // GLITCH_H

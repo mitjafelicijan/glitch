@@ -28,6 +28,10 @@ static const char *mic_active_bg_color = "firebrick";
 static const char *mic_muted_bg_color = "#222222";
 static const char *mic_active_fg_color = "white";
 static const char *mic_muted_fg_color = "white";
+static const char *layout_tile_bg_color = "darkgreen";
+static const char *layout_float_bg_color = "#333333";
+static const char *layout_tile_fg_color = "white";
+static const char *layout_float_fg_color = "white";
 
 static Shortcut shortcuts[] = {
 	/* Mask                 KeySym                    Shell command */
@@ -87,6 +91,7 @@ static Keybinds keybinds[] = {
 	{ MODKEY | ShiftMask,   XK_r,       reload,              { 0 }        },
 	{ MODKEY,               XK_c,       center_window,       { 0 }        },
 	{ MODKEY,               XK_m,       toggle_mic_mute,     { 0 }        },
+	{ MODKEY,               XK_space,   toggle_layout,       { 0 }        },
 	{ MODKEY | ShiftMask,   XK_q,       quit,                { 0 }        },
 	{ MODKEY,               XK_q,       close_window,        { 0 }        },
 };

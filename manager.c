@@ -253,6 +253,11 @@ void init_window_manager(void) {
 	XChangeProperty(wm.dpy, wm.root, _NET_CURRENT_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&current_desktop, 1);
 	log_message(stdout, LOG_DEBUG, "Registering %d desktops", NUM_DESKTOPS);
 
+	// Initialize layout modes.
+	for (int i = 0; i <= NUM_DESKTOPS; i++) {
+		wm.layout_modes[i] = LAYOUT_FLOATING;
+	}
+
 	// Initialize colormap early as it's needed for Xft.
 	wm.cmap = DefaultColormap(wm.dpy, wm.screen);
 
@@ -306,6 +311,30 @@ void init_window_manager(void) {
 		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to white", mic_muted_fg_color);
 		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_mic_muted_fg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, layout_tile_bg_color, &wm.xft_layout_tile_bg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to dark green", layout_tile_bg_color);
+		XRenderColor render_color = {0x0000, 0x6400, 0x0000, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_layout_tile_bg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, layout_float_bg_color, &wm.xft_layout_float_bg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to gray", layout_float_bg_color);
+		XRenderColor render_color = {0x3333, 0x3333, 0x3333, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_layout_float_bg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, layout_tile_fg_color, &wm.xft_layout_tile_fg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to white", layout_tile_fg_color);
+		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_layout_tile_fg);
+	}
+
+	if (!XftColorAllocName(wm.dpy, visual, wm.cmap, layout_float_fg_color, &wm.xft_layout_float_fg)) {
+		log_message(stdout, LOG_WARNING, "Failed to allocate color %s, falling back to white", layout_float_fg_color);
+		XRenderColor render_color = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+		XftColorAllocValue(wm.dpy, visual, wm.cmap, &render_color, &wm.xft_layout_float_fg);
 	}
 
 	wm.running = 1;
@@ -641,7 +670,8 @@ void handle_map_request(void) {
 	grab_buttons(window);
 
 	add_client(window);
-	
+	apply_tiling_layout();
+
 	XSync(wm.dpy, False);
 	XSetErrorHandler(old);
 
@@ -663,6 +693,7 @@ void handle_unmap_notify(void) {
 	}
 
 	log_message(stdout, LOG_DEBUG, "Window 0x%lx unmapped", window);
+	apply_tiling_layout();
 	update_client_list();
 }
 
@@ -673,6 +704,7 @@ void handle_destroy_notify(void) {
 		wm.active = None;
 	}
 	remove_client(window);
+	apply_tiling_layout();
 	log_message(stdout, LOG_DEBUG, "Window 0x%lx destroyed", window);
 	update_client_list();
 }
@@ -938,6 +970,7 @@ void goto_desktop(const Arg *arg) {
 
 	set_active_window(new_active, CurrentTime);
 	set_active_border(new_active);
+	apply_tiling_layout();
 
 	widget_desktop_indicator();
 	widget_datetime();
@@ -956,6 +989,7 @@ void send_window_to_desktop(const Arg *arg) {
 	XUnmapWindow(wm.dpy, wm.active);
 
 	wm.active = None;
+	apply_tiling_layout();
 	widget_desktop_indicator();
 	widget_datetime();
 	log_message(stdout, LOG_DEBUG, "Moved window to desktop %d", arg->i);
@@ -1611,4 +1645,76 @@ void reload(const Arg *arg) {
 	wm.running = 0;
 	wm.restart = 1;
 	log_message(stdout, LOG_DEBUG, "Reload window manager");
+}
+
+void apply_tiling_layout(void) {
+	if (wm.layout_modes[wm.current_desktop] != LAYOUT_TILING) return;
+
+	int n = 0;
+	for (Client *c = wm.clients; c; c = c->next) {
+		if (window_exists(c->window)) {
+			unsigned long desktop;
+			Atom actual_type;
+			int actual_format;
+			unsigned long nitems, bytes_after;
+			unsigned char *prop = NULL;
+
+			int status = XGetWindowProperty(wm.dpy, c->window, _NET_WM_DESKTOP, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+			if (status == Success && prop && nitems > 0) {
+				desktop = *(unsigned long *)prop;
+				XFree(prop);
+				if (desktop == wm.current_desktop && !is_sticky(c->window) && !is_always_on_top(c->window) && !has_wm_state(c->window, _NET_WM_STATE_FULLSCREEN)) {
+					n++;
+				}
+			} else if (prop) {
+				XFree(prop);
+			}
+		}
+	}
+
+	if (n == 0) return;
+
+	int screen_width = DisplayWidth(wm.dpy, wm.screen);
+	int screen_height = DisplayHeight(wm.dpy, wm.screen);
+	int mw = (n > 1) ? screen_width / 3 : screen_width;
+	int i = 0;
+
+	for (Client *c = wm.clients; c; c = c->next) {
+		if (window_exists(c->window)) {
+			unsigned long desktop;
+			Atom actual_type;
+			int actual_format;
+			unsigned long nitems, bytes_after;
+			unsigned char *prop = NULL;
+
+			int status = XGetWindowProperty(wm.dpy, c->window, _NET_WM_DESKTOP, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+			if (status == Success && prop && nitems > 0) {
+				desktop = *(unsigned long *)prop;
+				XFree(prop);
+				if (desktop == wm.current_desktop && !is_sticky(c->window) && !is_always_on_top(c->window) && !has_wm_state(c->window, _NET_WM_STATE_FULLSCREEN)) {
+					if (n == 1) {
+						XMoveResizeWindow(wm.dpy, c->window, 0, 0, screen_width - 2 * border_size, screen_height - 2 * border_size);
+					} else if (i == 0) { // Master
+						XMoveResizeWindow(wm.dpy, c->window, 0, 0, mw - 2 * border_size, screen_height - 2 * border_size);
+					} else { // Stack
+						int h = screen_height / (n - 1);
+						XMoveResizeWindow(wm.dpy, c->window, mw, (i - 1) * h, screen_width - mw - 2 * border_size, h - 2 * border_size);
+					}
+					i++;
+				}
+			} else if (prop) {
+				XFree(prop);
+			}
+		}
+	}
+}
+
+void toggle_layout(const Arg *arg) {
+	(void)arg;
+	wm.layout_modes[wm.current_desktop] = (wm.layout_modes[wm.current_desktop] == LAYOUT_TILING) ? LAYOUT_FLOATING : LAYOUT_TILING;
+	if (wm.layout_modes[wm.current_desktop] == LAYOUT_TILING) {
+		apply_tiling_layout();
+	}
+	redraw_widgets();
+	log_message(stdout, LOG_DEBUG, "Toggled layout for desktop %d to %s", wm.current_desktop, wm.layout_modes[wm.current_desktop] == LAYOUT_TILING ? "TILING" : "FLOATING");
 }
