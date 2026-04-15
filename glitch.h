@@ -50,6 +50,9 @@ typedef struct Client {
 	Window window;
 	struct Client *next;
 	struct Client *prev;
+	int saved_x, saved_y;
+	unsigned int saved_w, saved_h;
+	int has_saved_state;
 } Client;
 
 typedef struct {

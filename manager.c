@@ -130,6 +130,11 @@ static void add_client(Window w) {
 	new_c->window = w;
 	new_c->next = wm.clients;
 	new_c->prev = NULL;
+	new_c->saved_x = 0;
+	new_c->saved_y = 0;
+	new_c->saved_w = 0;
+	new_c->saved_h = 0;
+	new_c->has_saved_state = 0;
 
 	if (wm.clients) {
 		wm.clients->prev = new_c;
@@ -1678,9 +1683,64 @@ void apply_tiling_layout(void) {
 
 void toggle_layout(const Arg *arg) {
 	(void)arg;
-	wm.layout_modes[wm.current_desktop] = (wm.layout_modes[wm.current_desktop] == LAYOUT_TILING) ? LAYOUT_FLOATING : LAYOUT_TILING;
-	if (wm.layout_modes[wm.current_desktop] == LAYOUT_TILING) {
+	LayoutMode current_mode = wm.layout_modes[wm.current_desktop];
+
+	if (current_mode == LAYOUT_FLOATING) {
+		// Moving to TILING, save floating positions
+		for (Client *c = wm.clients; c; c = c->next) {
+			if (!window_exists(c->window)) continue;
+
+			unsigned long desktop;
+			Atom actual_type;
+			int actual_format;
+			unsigned long nitems, bytes_after;
+			unsigned char *prop = NULL;
+
+			int status = XGetWindowProperty(wm.dpy, c->window, _NET_WM_DESKTOP, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+			if (status == Success && prop && nitems > 0) {
+				desktop = *(unsigned long *)prop;
+				XFree(prop);
+				if (desktop == wm.current_desktop && !is_sticky(c->window) && !is_always_on_top(c->window) && !has_wm_state(c->window, _NET_WM_STATE_FULLSCREEN)) {
+					XWindowAttributes attr;
+					if (XGetWindowAttributes(wm.dpy, c->window, &attr)) {
+						c->saved_x = attr.x;
+						c->saved_y = attr.y;
+						c->saved_w = attr.width;
+						c->saved_h = attr.height;
+						c->has_saved_state = 1;
+					}
+				}
+			} else if (prop) {
+				XFree(prop);
+			}
+		}
+		wm.layout_modes[wm.current_desktop] = LAYOUT_TILING;
 		apply_tiling_layout();
+	} else {
+		// Moving to FLOATING, restore positions
+		wm.layout_modes[wm.current_desktop] = LAYOUT_FLOATING;
+		for (Client *c = wm.clients; c; c = c->next) {
+			if (!window_exists(c->window)) continue;
+			if (c->has_saved_state) {
+				unsigned long desktop;
+				Atom actual_type;
+				int actual_format;
+				unsigned long nitems, bytes_after;
+				unsigned char *prop = NULL;
+
+				int status = XGetWindowProperty(wm.dpy, c->window, _NET_WM_DESKTOP, 0, 1, False, XA_CARDINAL, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+				if (status == Success && prop && nitems > 0) {
+					desktop = *(unsigned long *)prop;
+					XFree(prop);
+					if (desktop == wm.current_desktop) {
+						XMoveResizeWindow(wm.dpy, c->window, c->saved_x, c->saved_y, c->saved_w, c->saved_h);
+						c->has_saved_state = 0;
+					}
+				} else if (prop) {
+					XFree(prop);
+				}
+			}
+		}
 	}
 	redraw_widgets();
 	log_message(stdout, LOG_DEBUG, "Toggled layout for desktop %d to %s", wm.current_desktop, wm.layout_modes[wm.current_desktop] == LAYOUT_TILING ? "TILING" : "FLOATING");
