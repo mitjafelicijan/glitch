@@ -276,7 +276,11 @@ void init_window_manager(void) {
 	WM_STATE_ATOM = XInternAtom(wm.dpy, "WM_STATE", False);
 
 	// Create supporting window for EWMH compliance.
-	Window check_win = XCreateSimpleWindow(wm.dpy, wm.root, 0, 0, 1, 1, 0, 0, 0);
+	XSetWindowAttributes wa;
+	wa.override_redirect = True;
+	Window check_win = XCreateWindow(wm.dpy, wm.root, -1, -1, 1, 1, 0,
+			CopyFromParent, InputOutput, CopyFromParent,
+			CWOverrideRedirect, &wa);
 	XMapWindow(wm.dpy, check_win);
 	XChangeProperty(wm.dpy, check_win, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&check_win, 1);
 	XChangeProperty(wm.dpy, check_win, _NET_WM_NAME, XA_STRING, 8, PropModeReplace, (unsigned char *)"LG3D", 4);
