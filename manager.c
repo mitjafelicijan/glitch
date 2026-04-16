@@ -36,6 +36,8 @@ static Atom WM_PROTOCOLS;
 static Atom WM_DELETE_WINDOW;
 static Atom WM_TAKE_FOCUS;
 static Atom _NET_SUPPORTED;
+static Atom _NET_FRAME_EXTENTS;
+static Atom WM_STATE_ATOM;
 
 static void update_window_border(Window window, int active) {
 	if (window == None) return;
@@ -96,6 +98,8 @@ static void add_client(Window w);
 static void remove_client(Window w);
 static Window get_toplevel_window(Window w);
 static void set_fullscreen(Window w, int full);
+static void send_configure(Window w);
+static Client *wintoclient(Window w);
 
 int x_error_handler(Display *dpy, XErrorEvent *ee) {
 	(void) dpy;
@@ -113,6 +117,11 @@ int x_error_handler(Display *dpy, XErrorEvent *ee) {
 	}
 	log_message(stderr, LOG_ERROR, "Fatal X Error: request_code=%d, error_code=%d, resource_id=0x%lx", ee->request_code, ee->error_code, ee->resourceid);
 	return 0;
+}
+
+static void set_client_state(Window w, long state) {
+	long data[] = { state, None };
+	XChangeProperty(wm.dpy, w, WM_STATE_ATOM, WM_STATE_ATOM, 32, PropModeReplace, (unsigned char *)data, 2);
 }
 
 static void add_client(Window w) {
@@ -141,6 +150,10 @@ static void add_client(Window w) {
 	}
 	wm.clients = new_c;
 	log_message(stdout, LOG_DEBUG, "Added client 0x%lx", w);
+
+	unsigned long extents[4] = {0, 0, 0, 0};
+	XChangeProperty(wm.dpy, w, _NET_FRAME_EXTENTS, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)extents, 4);
+	set_client_state(w, NormalState);
 }
 
 static void remove_client(Window w) {
@@ -157,6 +170,7 @@ static void remove_client(Window w) {
 				c->next->prev = c->prev;
 			}
 
+			set_client_state(w, WithdrawnState);
 			free(c);
 			log_message(stdout, LOG_DEBUG, "Removed client 0x%lx", w);
 			return;
@@ -258,26 +272,23 @@ void init_window_manager(void) {
 	_NET_SUPPORTED = XInternAtom(wm.dpy, "_NET_SUPPORTED", False);
 	_NET_SUPPORTING_WM_CHECK = XInternAtom(wm.dpy, "_NET_SUPPORTING_WM_CHECK", False);
 	_NET_WM_NAME = XInternAtom(wm.dpy, "_NET_WM_NAME", False);
-	_GLITCH_PRE_HMAX_GEOM = XInternAtom(wm.dpy, "_GLITCH_PRE_HMAX_GEOM", False);
-	_GLITCH_PRE_VMAX_GEOM = XInternAtom(wm.dpy, "_GLITCH_PRE_VMAX_GEOM", False);
-	_GLITCH_PRE_FULLSCREEN_GEOM = XInternAtom(wm.dpy, "_GLITCH_PRE_FULLSCREEN_GEOM", False);
-	_MOTIF_WM_HINTS = XInternAtom(wm.dpy, "_MOTIF_WM_HINTS", False);
-	WM_PROTOCOLS = XInternAtom(wm.dpy, "WM_PROTOCOLS", False);
-	WM_DELETE_WINDOW = XInternAtom(wm.dpy, "WM_DELETE_WINDOW", False);
-	WM_TAKE_FOCUS = XInternAtom(wm.dpy, "WM_TAKE_FOCUS", False);
+	_NET_FRAME_EXTENTS = XInternAtom(wm.dpy, "_NET_FRAME_EXTENTS", False);
+	WM_STATE_ATOM = XInternAtom(wm.dpy, "WM_STATE", False);
 
 	// Create supporting window for EWMH compliance.
 	Window check_win = XCreateSimpleWindow(wm.dpy, wm.root, 0, 0, 1, 1, 0, 0, 0);
+	XMapWindow(wm.dpy, check_win);
 	XChangeProperty(wm.dpy, check_win, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&check_win, 1);
-	XChangeProperty(wm.dpy, check_win, _NET_WM_NAME, XA_STRING, 8, PropModeReplace, (unsigned char *)"glitch", 6);
+	XChangeProperty(wm.dpy, check_win, _NET_WM_NAME, XA_STRING, 8, PropModeReplace, (unsigned char *)"LG3D", 4);
 	XChangeProperty(wm.dpy, wm.root, _NET_SUPPORTING_WM_CHECK, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&check_win, 1);
-	XChangeProperty(wm.dpy, wm.root, _NET_WM_NAME, XA_STRING, 8, PropModeReplace, (unsigned char *)"glitch", 6);
+	XChangeProperty(wm.dpy, wm.root, _NET_WM_NAME, XA_STRING, 8, PropModeReplace, (unsigned char *)"LG3D", 4);
 
 	// Set supported atoms.
 	Atom net_atoms[] = {
 		_NET_SUPPORTED,
 		_NET_SUPPORTING_WM_CHECK,
 		_NET_WM_NAME,
+		_NET_FRAME_EXTENTS,
 		_NET_WM_DESKTOP,
 		_NET_CURRENT_DESKTOP,
 		_NET_NUMBER_OF_DESKTOPS,
@@ -289,6 +300,7 @@ void init_window_manager(void) {
 		_NET_WM_STATE_MAXIMIZED_HORZ,
 		_NET_WM_STATE_MAXIMIZED_VERT,
 		_NET_WM_STATE_ABOVE,
+		WM_STATE_ATOM,
 		WM_DELETE_WINDOW,
 		WM_TAKE_FOCUS
 	};
@@ -600,11 +612,13 @@ int window_exists(Window window) {
 }
 
 void set_active_window(Window window, Time time) {
+	(void)time; // Use CurrentTime for more reliable focus stealing/pulling.
+
 	if (window != None) {
 		if (!window_exists(window)) return;
 
-		XChangeProperty(wm.dpy, wm.root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&window, 1);
 		wm.active = window;
+		XChangeProperty(wm.dpy, wm.root, _NET_ACTIVE_WINDOW, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&window, 1);
 
 		// Check for WM_TAKE_FOCUS support.
 		int take_focus = 0;
@@ -620,37 +634,33 @@ void set_active_window(Window window, Time time) {
 			XFree(protocols);
 		}
 
+		// Check WM_HINTS if needed (logging only for now as we force focus anyway)
+		XWMHints *hints = XGetWMHints(wm.dpy, window);
+		if (hints) {
+			log_message(stdout, LOG_DEBUG, "Window hints: input=%d", !!(hints->flags & InputHint && hints->input));
+			XFree(hints);
+		}
+
+		// Always set X focus for managed windows.
+		XSetInputFocus(wm.dpy, window, RevertToParent, CurrentTime);
+		log_message(stdout, LOG_DEBUG, "Set input focus to 0x%lx", window);
+
 		if (take_focus) {
-			XEvent ev;
+			XEvent ev = {0};
 			ev.type = ClientMessage;
 			ev.xclient.window = window;
 			ev.xclient.message_type = WM_PROTOCOLS;
 			ev.xclient.format = 32;
 			ev.xclient.data.l[0] = WM_TAKE_FOCUS;
-			ev.xclient.data.l[1] = time;
+			ev.xclient.data.l[1] = CurrentTime;
 			XSendEvent(wm.dpy, window, False, NoEventMask, &ev);
-			log_message(stdout, LOG_DEBUG, "Sent WM_TAKE_FOCUS to 0x%lx with time %lu", window, time);
-		}
-
-		int expects_input = 1;
-		XWMHints *hints = XGetWMHints(wm.dpy, window);
-		if (hints) {
-			if ((hints->flags & InputHint) && !hints->input) {
-				expects_input = 0;
-			}
-			XFree(hints);
-		}
-
-		if (expects_input) {
-			XSetInputFocus(wm.dpy, window, RevertToPointerRoot, time);
-			log_message(stdout, LOG_DEBUG, "Set input focus to 0x%lx with time %lu", window, time);
-		} else {
-			log_message(stdout, LOG_DEBUG, "Window 0x%lx does not expect input, skipping XSetInputFocus", window);
+			log_message(stdout, LOG_DEBUG, "Sent WM_TAKE_FOCUS to 0x%lx", window);
 		}
 	} else {
 		XDeleteProperty(wm.dpy, wm.root, _NET_ACTIVE_WINDOW);
 		wm.active = None;
-		XSetInputFocus(wm.dpy, wm.root, RevertToPointerRoot, time);
+		XSetInputFocus(wm.dpy, wm.root, RevertToParent, CurrentTime);
+		log_message(stdout, LOG_DEBUG, "Reset focus to root");
 	}
 	XFlush(wm.dpy);
 }
@@ -701,6 +711,46 @@ void handle_configure_request(void) {
 	log_message(stdout, LOG_DEBUG, "ConfigureRequest for 0x%lx (x=%d, y=%d, w=%d, h=%d)", ev->window, ev->x, ev->y, ev->width, ev->height);
 }
 
+void handle_configure_notify(void) {
+	XConfigureEvent *ev = &wm.ev.xconfigure;
+
+	if (ev->window == wm.root) return;
+	
+	// Only send synthetic events for windows we manage as top-level clients.
+	Client *c;
+	for (c = wm.clients; c; c = c->next) {
+		if (c->window == ev->window) {
+			log_message(stdout, LOG_DEBUG, "Sending synthetic ConfigureNotify to 0x%lx (x=%d, y=%d, w=%d, h=%d)", ev->window, ev->x, ev->y, ev->width, ev->height);
+			send_configure(c->window);
+			break;
+		}
+	}
+}
+
+void handle_map_notify(void) {
+	Window window = wm.ev.xmap.window;
+	if (window == wm.root) return;
+
+	log_message(stdout, LOG_DEBUG, "MapNotify for 0x%lx", window);
+
+	// Check if this is a managed window.
+	Client *c;
+	for (c = wm.clients; c; c = c->next) {
+		if (c->window == window) {
+			// Shows, raises and focuses the window.
+			set_active_border(window);
+			set_active_window(window, CurrentTime);
+			
+			// Ensure it has synthetic configure after mapping.
+			send_configure(window);
+			
+			log_message(stdout, LOG_DEBUG, "Focused and configured 0x%lx after MapNotify", window);
+			break;
+		}
+	}
+	redraw_widgets();
+}
+
 // https://tronche.com/gui/x/xlib/events/structure-control/map.html
 void handle_map_request(void) {
 	Window window = wm.ev.xmaprequest.window;
@@ -711,7 +761,7 @@ void handle_map_request(void) {
 	// Move window under cursor position and clamps inside the screen bounds.
 	XWindowAttributes check_attr;
 	if (XGetWindowAttributes(wm.dpy, window, &check_attr)) {
-		XSelectInput(wm.dpy, window, EnterWindowMask | LeaveWindowMask);
+		XSelectInput(wm.dpy, window, EnterWindowMask | LeaveWindowMask | StructureNotifyMask | FocusChangeMask);
 
 		Window root_return, child_return;
 		int root_x, root_y, win_x, win_y;
@@ -737,24 +787,19 @@ void handle_map_request(void) {
 	unsigned long desktop = wm.current_desktop;
 	XChangeProperty(wm.dpy, window, _NET_WM_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&desktop, 1);
 
-	XMapWindow(wm.dpy, window);
-	raise_window(window);
-
-	// Shows, raises and focuses the window.
-	set_active_border(window);
-	set_active_window(window, CurrentTime);
-
 	// Grab buttons for click-to-focus.
 	grab_buttons(window);
 
 	add_client(window);
 	apply_tiling_layout();
 
+	XMapWindow(wm.dpy, window);
+	raise_window(window);
+
 	XSync(wm.dpy, False);
 	XSetErrorHandler(old);
 
-	log_message(stdout, LOG_DEBUG, "Window 0x%lx mapped and grabbed on desktop %d", window, wm.current_desktop);
-	redraw_widgets();
+	log_message(stdout, LOG_DEBUG, "Window 0x%lx added and requested map on desktop %d", window, wm.current_desktop);
 	update_client_list();
 }
 
@@ -762,7 +807,7 @@ void handle_map_request(void) {
 void handle_unmap_notify(void) {
 	Window window = wm.ev.xunmap.window;
 	if (window == wm.active) {
-		wm.active = None;
+		set_active_window(None, CurrentTime);
 	}
 
 	// So if we get an unmap for a sticky window, it means the application closed it.
@@ -779,7 +824,7 @@ void handle_unmap_notify(void) {
 void handle_destroy_notify(void) {
 	Window window = wm.ev.xdestroywindow.window;
 	if (window == wm.active) {
-		wm.active = None;
+		set_active_window(None, CurrentTime);
 	}
 	remove_client(window);
 	apply_tiling_layout();
@@ -806,6 +851,7 @@ void handle_motion_notify(void) {
 				wm.attr.y + (wm.start.button == 1 ? ydiff : 0),
 				MAX(100, wm.attr.width  + (wm.start.button == 3 ? xdiff : 0)),
 				MAX(100, wm.attr.height + (wm.start.button == 3 ? ydiff : 0)));
+		send_configure(wm.start.subwindow);
 
 		// Reset maximization state on manual move/resize.
 		if (wm.start.button == 1) {
@@ -847,6 +893,53 @@ void handle_client_message(void) {
 	XFlush(wm.dpy);
 }
 
+static Client *wintoclient(Window w) {
+	if (w == None || w == wm.root) return NULL;
+	Client *c;
+	for (c = wm.clients; c; c = c->next) {
+		if (c->window == w) return c;
+	}
+	// Search parent hierarchy
+	Window root, parent, *children;
+	unsigned int nchildren;
+	XErrorHandler old = XSetErrorHandler(ignore_x_error);
+	while (w != wm.root && w != None) {
+		if (XQueryTree(wm.dpy, w, &root, &parent, &children, &nchildren)) {
+			if (children) XFree(children);
+			for (c = wm.clients; c; c = c->next) {
+				if (c->window == parent) {
+					XSetErrorHandler(old);
+					return c;
+				}
+			}
+			w = parent;
+		} else {
+			break;
+		}
+	}
+	XSetErrorHandler(old);
+	return NULL;
+}
+
+static void send_configure(Window w) {
+	XWindowAttributes wa;
+	if (!XGetWindowAttributes(wm.dpy, w, &wa)) return;
+
+	XConfigureEvent ce;
+	ce.type = ConfigureNotify;
+	ce.display = wm.dpy;
+	ce.event = w;
+	ce.window = w;
+	ce.x = wa.x;
+	ce.y = wa.y;
+	ce.width = wa.width;
+	ce.height = wa.height;
+	ce.border_width = wa.border_width;
+	ce.above = None;
+	ce.override_redirect = False;
+	XSendEvent(wm.dpy, w, False, StructureNotifyMask, (XEvent *)&ce);
+}
+
 static void set_fullscreen(Window window, int full) {
 	int currently_fullscreen = has_wm_state(window, _NET_WM_STATE_FULLSCREEN);
 
@@ -862,6 +955,7 @@ static void set_fullscreen(Window window, int full) {
 			int screen_height = DisplayHeight(wm.dpy, wm.screen);
 
 			XMoveResizeWindow(wm.dpy, window, 0, 0, screen_width, screen_height);
+			send_configure(window);
 			XSetWindowBorderWidth(wm.dpy, window, 0);
 			XRaiseWindow(wm.dpy, window);
 
@@ -883,6 +977,7 @@ static void set_fullscreen(Window window, int full) {
 		if (status == Success && prop && nitems == 4) {
 			long *geom = (long *)prop;
 			XMoveResizeWindow(wm.dpy, window, (int)geom[0], (int)geom[1], (unsigned int)geom[2], (unsigned int)geom[3]);
+			send_configure(window);
 		}
 		if (prop) XFree(prop);
 
@@ -921,17 +1016,23 @@ void center_window(const Arg *arg) {
 		if (new_y < 0) new_y = 0;
 
 		XMoveWindow(wm.dpy, wm.active, new_x, new_y);
+		send_configure(wm.active);
 		log_message(stdout, LOG_DEBUG, "Centered window 0x%lx at (%d, %d)", wm.active, new_x, new_y);
 	}
 }
 
 // https://tronche.com/gui/x/xlib/events/keyboard-pointer/keyboard-pointer.html
 void handle_button_press(void) {
-	Window window;
-	if (wm.ev.xbutton.window == wm.root) {
-		window = wm.ev.xbutton.subwindow;
-	} else {
+	Window window = None;
+	Client *c = wintoclient(wm.ev.xbutton.window);
+	if (!c) c = wintoclient(wm.ev.xbutton.subwindow);
+
+	if (c) {
+		window = c->window;
+	} else if (wm.ev.xbutton.window != wm.root) {
 		window = wm.ev.xbutton.window;
+	} else {
+		window = wm.ev.xbutton.subwindow;
 	}
 
 	log_message(stdout, LOG_DEBUG, "ButtonPress: window=0x%lx, subwindow=0x%lx, button=%d, state=0x%x, targeting=0x%lx", 
@@ -1161,8 +1262,12 @@ void handle_key_release(void) {
 
 void handle_focus_in(void) {
 	Window window = wm.ev.xfocus.window;
-	if (window != wm.root) {
-		log_message(stdout, LOG_DEBUG, "Window 0x%lx focus in", window);
+	if (window == wm.root || window == None) return;
+
+	Client *c = wintoclient(window);
+	if (wm.active != None && (!c || c->window != wm.active)) {
+		log_message(stdout, LOG_DEBUG, "Window 0x%lx focus in (foreign), forcing back to active 0x%lx", window, wm.active);
+		set_active_window(wm.active, CurrentTime);
 	}
 }
 
@@ -1220,7 +1325,7 @@ void move_window_x(const Arg *arg) {
 	check_and_clear_maximized_state(wm.active, 1, 0);
 	log_message(stdout, LOG_DEBUG, "Move window 0x%lx on X by %d", wm.active, arg->i);
 
-	XSync(wm.dpy, True);
+	XSync(wm.dpy, False);
 	XFlush(wm.dpy);
 }
 
@@ -1233,7 +1338,7 @@ void move_window_y(const Arg *arg) {
 	check_and_clear_maximized_state(wm.active, 0, 1);
 	log_message(stdout, LOG_DEBUG, "Move window 0x%lx on Y by %d", wm.active, arg->i);
 
-	XSync(wm.dpy, True);
+	XSync(wm.dpy, False);
 	XFlush(wm.dpy);
 }
 
@@ -1255,7 +1360,7 @@ void close_window(const Arg *arg) {
 	}
 
 	if (supported) {
-		XEvent ev;
+		XEvent ev = {0};
 		ev.type = ClientMessage;
 		ev.xclient.window = wm.active;
 		ev.xclient.message_type = WM_PROTOCOLS;
@@ -1716,11 +1821,14 @@ void apply_tiling_layout(void) {
 				if (desktop == wm.current_desktop && !is_sticky(c->window) && !is_always_on_top(c->window) && !has_wm_state(c->window, _NET_WM_STATE_FULLSCREEN)) {
 					if (n == 1) {
 						XMoveResizeWindow(wm.dpy, c->window, 0, 0, screen_width - 2 * border_size, screen_height - 2 * border_size);
+						send_configure(c->window);
 					} else if (i == 0) { // Master
 						XMoveResizeWindow(wm.dpy, c->window, 0, 0, mw - 2 * border_size, screen_height - 2 * border_size);
+						send_configure(c->window);
 					} else { // Stack
 						int h = screen_height / (n - 1);
 						XMoveResizeWindow(wm.dpy, c->window, mw, (i - 1) * h, screen_width - mw - 2 * border_size, h - 2 * border_size);
+						send_configure(c->window);
 					}
 					i++;
 				}

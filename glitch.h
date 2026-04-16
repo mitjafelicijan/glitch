@@ -156,6 +156,7 @@ void log_message(FILE *stream, LogLevel level, const char* format, ...);
 void init_window_manager(void);
 void deinit_window_manager(void);
 void handle_map_request(void);
+void handle_map_notify(void);
 void handle_unmap_notify(void);
 void handle_destroy_notify(void);
 void handle_property_notify(void);
@@ -170,6 +171,7 @@ void handle_focus_out(void);
 void handle_enter_notify(void);
 void handle_expose(void);
 void handle_configure_request(void);
+void handle_configure_notify(void);
 
 Window get_active_window(void);
 void set_active_window(Window window, Time time);

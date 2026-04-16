@@ -72,6 +72,9 @@ int main(int argc, char *argv[]) {
 			case MapRequest:
 				handle_map_request();
 				break;
+			case MapNotify:
+				handle_map_notify();
+				break;
 			case UnmapNotify:
 				handle_unmap_notify();
 				break;
@@ -115,6 +118,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case ConfigureRequest:
 				handle_configure_request();
+				break;
+			case ConfigureNotify:
+				handle_configure_notify();
 				break;
 		}
 		XUnlockDisplay(wm.dpy);
