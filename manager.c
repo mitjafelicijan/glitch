@@ -714,7 +714,7 @@ void handle_configure_request(void) {
 void handle_configure_notify(void) {
 	XConfigureEvent *ev = &wm.ev.xconfigure;
 
-	if (ev->window == wm.root) return;
+	if (ev->window == wm.root || ev->send_event) return;
 	
 	// Only send synthetic events for windows we manage as top-level clients.
 	Client *c;

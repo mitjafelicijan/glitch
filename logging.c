@@ -12,17 +12,17 @@
 static LogLevel max_level = LOG_INFO;
 
 static const char* level_strings[] = {
+	"ERROR",
+	"WARN",
 	"INFO",
 	"DEBUG",
-	"WARN",
-	"ERROR",
 };
 
 static const char* level_colors[] = {
+	COLOR_ERROR,
+	COLOR_WARNING,
 	COLOR_INFO,
 	COLOR_DEBUG,
-	COLOR_WARNING,
-	COLOR_ERROR,
 };
 
 void set_log_level(LogLevel level) {

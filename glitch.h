@@ -26,10 +26,10 @@ extern Atom _NET_WM_DESKTOP;
 #define COLOR_RESET    "\x1B[0m"
 
 typedef enum {
+	LOG_ERROR,
+	LOG_WARNING,
 	LOG_INFO,
 	LOG_DEBUG,
-	LOG_WARNING,
-	LOG_ERROR,
 } LogLevel;
 
 typedef enum {
