@@ -44,7 +44,7 @@ static int launcher_height = 600;
 
 static Shortcut shortcuts[] = {
 	/* Mask                 KeySym                    Shell command */
-	{ MODKEY,               XK_Return,                "alacritty" },
+	{ MODKEY,               XK_Return,                "st -f 'Berkeley Mono:style=Bold:size=10' -g 110x60" },
 	{ ControlMask,          XK_Escape,                "sh -c 'maim -s | xclip -selection clipboard -t image/png'" },
 	{ MODKEY,               XK_w,                     "brave --new-window" },
 	{ MODKEY,               XK_e,                     "thunar" },
