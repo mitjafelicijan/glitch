@@ -152,9 +152,8 @@ void cycle_active_window(const Arg *arg) {
 				}
 			}
 			if (prop) XFree(prop);
-			if (is_sticky(w)) on_current_desktop = 1;
 
-			if (on_current_desktop) {
+			if (on_current_desktop && !is_sticky(w)) {
 				XWindowAttributes wa;
 				XGetWindowAttributes(wm.dpy, w, &wa);
 				if (wa.map_state == IsViewable) {
